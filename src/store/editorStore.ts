@@ -8,7 +8,7 @@ interface EditorState {
   removeBlockFromOrder: (id: string) => void;
 }
 
-export const useEditoreStore = create<EditorState>((set, get) => ({
+export const useEditoreStore = create<EditorState>((set) => ({
   documentId: "",
   title: "",
   orderedBlockIds: ["1", "2"],

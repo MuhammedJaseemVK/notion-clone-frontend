@@ -2,9 +2,7 @@
 import { useEditoreStore } from "../store/editorStore";
 import { BlockRenderer } from "./BlockRenderer";
 
-type Props = {};
-
-const EditorRoot = (props: Props) => {
+const EditorRoot = () => {
   const orderedBlockIds = useEditoreStore((state) => state.orderedBlockIds);
   console.log("EDITOR ROOT");
 

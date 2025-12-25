@@ -15,6 +15,7 @@ interface BlockState {
   addBlockBelow: (currentId: string) => string;
   mergeBlocks: (targetId: string, sourceId: string) => void;
   updateBlock: (id: string, content: string) => void;
+  splitBlock: (id: string, at: number) => string;
 }
 
 export const useBlockStore = create<BlockState>((set, get) => ({
@@ -77,4 +78,29 @@ export const useBlockStore = create<BlockState>((set, get) => ({
         },
       },
     })),
+  splitBlock: (id, at) => {
+    const state = get();
+    const block = state.blocks[id];
+
+    const before = block.content.slice(0, at);
+    const after = block.content.slice(at);
+
+    const newId = nanoid();
+    set({
+      blocks: {
+        ...state.blocks,
+        [id]: {
+          ...block,
+          content: before,
+        },
+        [newId]: {
+          id: newId,
+          content: after,
+          type: block.type,
+          version:1
+        },
+      },
+    });
+    return newId;
+  },
 }));

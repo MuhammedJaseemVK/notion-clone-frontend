@@ -17,7 +17,7 @@ const ParagraphBlock = ({ blockId }: ParagraphBlockProps) => {
   const removeBlockFromOrder = useEditoreStore(
     (state) => state.removeBlockFromOrder
   );
-  const ordered = useEditoreStore((state) => state.orderedBlockIds);
+  const ordered = useEditoreStore.getState().orderedBlockIds;
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLDivElement>) => {
@@ -28,14 +28,71 @@ const ParagraphBlock = ({ blockId }: ParagraphBlockProps) => {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && e.shiftKey) {
         e.preventDefault();
+
+        const selection = window.getSelection();
+        const offset = selection?.anchorOffset ?? 0;
+
+        const text = blockRef.current?.textContent ?? "";
+        const before = text.slice(0, offset);
+        const after = text.slice(offset);
+
+        const next = before + "\n" + after;
+        updateBlock(blockId, next);
+
+        requestAnimationFrame(() => {
+          const element = blockRef.current;
+          if (!element) {
+            return;
+          }
+
+          const textNode = element.firstChild;
+          const range = document.createRange();
+          range.setStart(textNode!, offset + 1);
+          range.collapse(true);
+
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+
+          element.focus();
+        });
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+
+        const selection = window.getSelection();
+        const node = selection?.anchorNode;
+        const offset = selection?.anchorOffset;
+
+        if (!node || !blockRef.current?.contains(node)) {
+          return;
+        }
+
+        const fullText = blockRef.current?.textContent ?? "";
+        const before = fullText.slice(0, offset);
+        const after = fullText.slice(offset);
+
+        updateBlock(blockId, before);
 
         const newId = addBlockBelow(blockId);
         insertBlockAfter(blockId, newId);
+        updateBlock(newId, after);
 
         requestAnimationFrame(() => {
           const element = document.getElementById(newId);
+          if (!element) {
+            return;
+          }
+
+          const range = document.createRange();
+          const textNode = element.firstChild;
+          range.setStart(textNode || element, 0);
+          range.collapse(true);
+
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
           element?.focus();
         });
       } else if (e.key === "Backspace") {
@@ -87,6 +144,7 @@ const ParagraphBlock = ({ blockId }: ParagraphBlockProps) => {
       mergeBlcoks,
       ordered,
       removeBlockFromOrder,
+      updateBlock,
     ]
   );
 
@@ -107,7 +165,7 @@ const ParagraphBlock = ({ blockId }: ParagraphBlockProps) => {
       suppressContentEditableWarning
       onInput={handleChange}
       onKeyDown={handleKeyDown}
-      style={{ outline: "none" }}
+      style={{ outline: "none", whiteSpace: "pre-wrap" }}
     />
   );
 };
