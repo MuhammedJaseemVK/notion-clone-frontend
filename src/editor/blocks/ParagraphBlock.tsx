@@ -28,13 +28,15 @@ const ParagraphBlock = ({ blockId }: ParagraphBlockProps) => {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const selection = window.getSelection();
+      const offset = selection?.anchorOffset ?? 0;
+      const text = blockRef.current?.textContent ?? "";
+      const isAtStart = offset === 0;
+      const isAtEnd = offset === text.length;
+
       if (e.key === "Enter" && e.shiftKey) {
         e.preventDefault();
 
-        const selection = window.getSelection();
-        const offset = selection?.anchorOffset ?? 0;
-
-        const text = blockRef.current?.textContent ?? "";
         const before = text.slice(0, offset);
         const after = text.slice(offset);
 
@@ -94,6 +96,113 @@ const ParagraphBlock = ({ blockId }: ParagraphBlockProps) => {
           selection?.removeAllRanges();
           selection?.addRange(range);
           element?.focus();
+        });
+      } else if (e.key === "ArrowUp") {
+        const selection = window.getSelection();
+        const offset = selection?.anchorOffset ?? 0;
+
+        if (offset !== 0) {
+          return;
+        }
+        const ordered = useEditoreStore.getState().orderedBlockIds;
+        const index = ordered.indexOf(blockId);
+        if (index <= 0) {
+          return;
+        }
+        const prevId = ordered[index - 1];
+
+        e.preventDefault();
+
+        requestAnimationFrame(() => {
+          const element = document.getElementById(prevId);
+          if (!element) {
+            return;
+          }
+          const text = element.textContent ?? "";
+          const range = document.createRange();
+          const textNode = element.firstChild;
+
+          range.setStart(textNode || element, text.length);
+          range.collapse(true);
+
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+          element.focus();
+        });
+      } else if (e.key === "ArrowDown") {
+        const selection = window.getSelection();
+        const text = blockRef.current?.textContent ?? "";
+        const offset = selection?.anchorOffset;
+
+        if (offset !== text.length) {
+          return;
+        }
+
+        const ordered = useEditoreStore.getState().orderedBlockIds;
+        const index = ordered.indexOf(blockId);
+        const nextId = ordered[index + 1];
+        if (!nextId) {
+          return;
+        }
+
+        e.preventDefault();
+
+        requestAnimationFrame(() => {
+          const element = document.getElementById(nextId);
+          if (!element) {
+            return;
+          }
+
+          const range = document.createRange();
+          const textNode = element.firstChild;
+
+          range.setStart(textNode || element, 0);
+          range.collapse(false);
+
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+
+          element.focus();
+        });
+      } else if (e.key === "Delete") {
+        if (!isAtEnd) {
+          return;
+        }
+
+        const ordered = useEditoreStore.getState().orderedBlockIds;
+        const index = ordered.indexOf(blockId);
+        const nextId = ordered[index + 1];
+        if (!nextId) {
+          return;
+        }
+
+        e.preventDefault();
+
+        const nextBlock = useBlockStore.getState().blocks[nextId];
+        const caretOffset = text.length;
+
+        updateBlock(blockId, text + (nextBlock.content ?? ""));
+        removeBlockFromOrder(nextId);
+
+        requestAnimationFrame(() => {
+          const element = document.getElementById(blockId);
+          if (!element) {
+            return;
+          }
+
+          const range = document.createRange();
+          const textNode = element.firstChild;
+
+          range.setStart(textNode!, caretOffset);
+          range.collapse(true);
+
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+
+          element.focus();
         });
       } else if (e.key === "Backspace") {
         const selection = window.getSelection();
