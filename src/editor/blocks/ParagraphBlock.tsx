@@ -1,5 +1,6 @@
 import { useBlockStore } from "@/src/store/blockStore";
 import { useEditoreStore } from "@/src/store/editorStore";
+import { useHistoryStore } from "@/src/store/historyStore";
 import React, { useCallback, useLayoutEffect, useRef } from "react";
 
 interface ParagraphBlockProps {
@@ -19,19 +20,93 @@ const ParagraphBlock = ({ blockId }: ParagraphBlockProps) => {
   );
   const ordered = useEditoreStore.getState().orderedBlockIds;
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLDivElement>) => {
-      updateBlock(blockId, e.target.textContent || "");
-    },
-    [blockId, updateBlock]
-  );
+  const handleChange = (e: React.ChangeEvent<HTMLDivElement>) => {
+    const history = useHistoryStore.getState();
+    const oldContent = content;
+    const newContent = e.target.textContent || "";
+
+    const selection = window.getSelection();
+    const caretOffset = selection?.anchorOffset ?? 0;
+
+    updateBlock(blockId, newContent);
+
+    history.push({
+      do: () => {updateBlock(blockId, newContent);
+
+        requestAnimationFrame(() => {
+          const element = document.getElementById(blockId);
+          if (!element) {
+            return;
+          }
+
+          const range = document.createRange();
+          const textNode = element.firstChild;
+
+          const safeOffset = Math.min(
+            caretOffset,
+            textNode?.textContent?.length ?? 0
+          );
+
+          range.setStart(textNode || element, safeOffset);
+          range.collapse(true);
+
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+
+          element.focus();
+        });
+      },
+      undo: () => {
+        updateBlock(blockId, oldContent);
+
+        requestAnimationFrame(() => {
+          const element = document.getElementById(blockId);
+          if (!element) {
+            return;
+          }
+
+          const range = document.createRange();
+          const textNode = element.firstChild;
+
+          const safeOffset = Math.min(
+            caretOffset,
+            textNode?.textContent?.length ?? 0
+          );
+
+          range.setStart(textNode || element, safeOffset);
+          range.collapse(true);
+
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+
+          element.focus();
+        });
+      },
+    });
+  };
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "z"
+      ) {
+        e.preventDefault();
+        useHistoryStore.getState().redo();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        useHistoryStore.getState().undo();
+        return;
+      }
+
       const selection = window.getSelection();
       const offset = selection?.anchorOffset ?? 0;
       const text = blockRef.current?.textContent ?? "";
-      const isAtStart = offset === 0;
       const isAtEnd = offset === text.length;
 
       if (e.key === "Enter" && e.shiftKey) {
@@ -158,7 +233,7 @@ const ParagraphBlock = ({ blockId }: ParagraphBlockProps) => {
           const textNode = element.firstChild;
 
           range.setStart(textNode || element, 0);
-          range.collapse(false);
+          range.collapse(true);
 
           const selection = window.getSelection();
           selection?.removeAllRanges();
